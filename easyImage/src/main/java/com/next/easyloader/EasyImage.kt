@@ -38,6 +38,9 @@ import java.util.concurrent.*
 import kotlin.Comparator
 import kotlin.collections.LinkedHashMap
 
+internal const val CONNECT_TIMEOUT = 15_000
+internal const val READ_TIMEOUT = 30_000
+
 object EasyImage : LifecycleEventObserver {
     private lateinit var io: CoroutineDispatcher
     private lateinit var main: CoroutineDispatcher
@@ -72,8 +75,8 @@ object EasyImage : LifecycleEventObserver {
         decoderFactoryMap["gif"] = GifDecoderFactory(gifDispatcher, main)
 
         val okHttp = OkHttpClient.Builder()
-            .connectTimeout((15 * 1000).toLong(), TimeUnit.MILLISECONDS)
-            .readTimeout((30 * 1000).toLong(), TimeUnit.MILLISECONDS)
+            .connectTimeout((CONNECT_TIMEOUT).toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout((READ_TIMEOUT).toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(true)
             .build()
 
