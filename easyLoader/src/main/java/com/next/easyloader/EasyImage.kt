@@ -34,58 +34,11 @@ import java.util.*
 import java.util.concurrent.*
 import kotlin.collections.LinkedHashMap
 
-class LIFOExecutor(private val executorService: ExecutorService) : Executor {
-    private val commandList: LinkedList<Runnable> = LinkedList()
-    private val pausedCommandList: LinkedList<Runnable> = LinkedList()
-
-    @Volatile
-    private var paused = false
-
-    override fun execute(command: Runnable) {
-        synchronized(pausedCommandList) {
-            if (paused) {
-                pausedCommandList.add(command)
-                return
-            }
-        }
-
-        synchronized(commandList) {
-            commandList.add(command)
-        }
-        executorService.execute {
-            val last: Runnable
-            synchronized(commandList) {
-                last = commandList.removeLast()
-            }
-
-            last.run()
-        }
-    }
-
-    fun pause() {
-        synchronized(pausedCommandList) {
-            paused = true
-        }
-    }
-
-    fun resume() {
-        synchronized(pausedCommandList) {
-            paused = false
-
-            for (run: Runnable in pausedCommandList) {
-                execute(run)
-            }
-
-            pausedCommandList.clear()
-        }
-    }
-}
-
 object EasyImage : LifecycleEventObserver {
     private lateinit var io: CoroutineDispatcher
     private lateinit var main: CoroutineDispatcher
 
-    private val map: MutableMap<Any, LoaderManager> = mutableMapOf()
+    private val map: MutableMap<LifecycleOwner, RequestManager> = mutableMapOf()
     private val decoderFactoryMap: MutableMap<String, DecoderFactory> = mutableMapOf()
     private val allCompletedRequests = LinkedHashMap<Request, Request>()
     internal lateinit var diskCache: DiskCache
@@ -110,7 +63,7 @@ object EasyImage : LifecycleEventObserver {
 
         diskCache = DefaultDiskCache(context)
         val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
-        memoryCache = LruMemoryCache(context, memorySizeCalculator.memoryCacheSize)
+        memoryCache = LruMemoryCache(memorySizeCalculator.memoryCacheSize)
 
         decoderFactoryMap["gif"] = GifDecoderFactory(gifDispatcher, main)
 
@@ -136,12 +89,12 @@ object EasyImage : LifecycleEventObserver {
     }
 
     @MainThread
-    fun with(lifecycleOwner: LifecycleOwner): LoaderManager {
+    fun with(lifecycleOwner: LifecycleOwner): RequestManager {
         val manager = map[lifecycleOwner]
         if (manager != null)
             return manager
 
-        val loaderManager = LoaderManager(this, io, main)
+        val loaderManager = RequestManager(this, io, main)
         map[lifecycleOwner] = loaderManager
 
         lifecycleOwner.lifecycle.addObserver(this)
@@ -159,8 +112,8 @@ object EasyImage : LifecycleEventObserver {
 
     override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
         when (event) {
-            Lifecycle.Event.ON_RESUME -> onResume(source)
-            Lifecycle.Event.ON_PAUSE -> onPause(source)
+//            Lifecycle.Event.ON_RESUME -> onResume(source)
+//            Lifecycle.Event.ON_PAUSE -> onPause(source)
             Lifecycle.Event.ON_DESTROY -> onDestroy(source)
             else -> doNothing()
         }
@@ -170,15 +123,16 @@ object EasyImage : LifecycleEventObserver {
 
     }
 
+    /*
     private fun onResume(source: LifecycleOwner) {
-        val loaderManager = map[source]
+//        val loaderManager = map[source]
 //        loaderManager?.resume()
     }
 
     private fun onPause(source: LifecycleOwner) {
 //        map[source]?.pause()
     }
-
+     */
     private fun onDestroy(source: LifecycleOwner) {
         map[source]?.release()
         map.remove(source)
@@ -209,18 +163,8 @@ object EasyImage : LifecycleEventObserver {
 
 }
 
-class EasyImageBuilder(
-    internal val application: Application,
-    internal val io: ExecutorService? = null,
-    internal val main: CoroutineDispatcher? = null
-) {
-    fun build() {
-        EasyImage.install(this)
-    }
-}
 
-
-class LoaderManager(
+class RequestManager(
     val easyLoader: EasyImage,
     private val io: CoroutineDispatcher,
     private val main: CoroutineDispatcher
@@ -238,13 +182,12 @@ class LoaderManager(
         }
 
         requestMap.clear()
-//        requestList.clear()
     }
 
     internal fun onStartRequestOnly(request: Request, imageView: ImageView) {
         request.job = GlobalScope.launch(io) {
             try {
-                var drawable = request.load(this)
+                val drawable = request.load(this)
 
                 launch(main) {
                     request.onLoaded(drawable)
@@ -286,7 +229,7 @@ class LoaderManager(
 
 }
 
-class RequestBuilder(private val manager: LoaderManager) {
+class RequestBuilder(private val manager: RequestManager) {
     private lateinit var url: String
     private var placeholder: Int = 0
     private var errorResId: Int = 0
@@ -344,7 +287,7 @@ class RequestBuilder(private val manager: LoaderManager) {
 }
 
 class Request(
-    private val manager: LoaderManager,
+    private val manager: RequestManager,
     private val source: Source,
     private val placeholder: Int,
     private val errorResId: Int,
@@ -357,11 +300,11 @@ class Request(
     private var ref: WeakReference<ImageView> = WeakReference(target)
     private val hash = source.hashCode() + target.hashCode()
     var job: Job? = null
-    var completed = false
+    private var completed = false
 
     @Volatile
     var drawable: Drawable? = null
-    var previousDrawable: Drawable? = null
+    private var previousDrawable: Drawable? = null
     private var targetW = -1
     private var targetH = -1
     private var listening = false
@@ -572,6 +515,53 @@ class Request(
     }
 }
 
+internal class LIFOExecutor(private val executorService: ExecutorService) : Executor {
+    private val commandList: LinkedList<Runnable> = LinkedList()
+    private val pausedCommandList: LinkedList<Runnable> = LinkedList()
+
+    @Volatile
+    private var paused = false
+
+    override fun execute(command: Runnable) {
+        synchronized(pausedCommandList) {
+            if (paused) {
+                pausedCommandList.add(command)
+                return
+            }
+        }
+
+        synchronized(commandList) {
+            commandList.add(command)
+        }
+        executorService.execute {
+            val last: Runnable
+            synchronized(commandList) {
+                last = commandList.removeLast()
+            }
+
+            last.run()
+        }
+    }
+
+    fun pause() {
+        synchronized(pausedCommandList) {
+            paused = true
+        }
+    }
+
+    fun resume() {
+        synchronized(pausedCommandList) {
+            paused = false
+
+            for (run: Runnable in pausedCommandList) {
+                execute(run)
+            }
+
+            pausedCommandList.clear()
+        }
+    }
+}
+
 internal object DefaultDecoder : Decoder {
 
     override fun decode(bytes: ByteArray, w: Int, h: Int): Drawable? {
@@ -606,7 +596,7 @@ internal object DefaultDecoder : Decoder {
 }
 
 
-internal class DefaultDiskCache(private val context: Context) : DiskCache {
+internal class DefaultDiskCache(context: Context) : DiskCache {
 
     private val dir: File
 
@@ -638,7 +628,7 @@ internal class DefaultDiskCache(private val context: Context) : DiskCache {
     }
 }
 
-internal class LruMemoryCache(private val context: Context, private val maxSize: Int) :
+internal class LruMemoryCache(private val maxSize: Int) :
     MemoryCache {
     private val cache: LruCache<String, Drawable> = object : LruCache<String, Drawable>(maxSize) {
         override fun sizeOf(key: String, value: Drawable): Int {
