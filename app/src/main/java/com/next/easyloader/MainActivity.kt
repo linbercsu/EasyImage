@@ -6,7 +6,6 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.ImageView
-import java.io.File
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -24,7 +23,7 @@ class MainActivity : AppCompatActivity() {
         val imageView2 = findViewById<ImageView>(R.id.image_view2)
         val imageView3 = findViewById<ImageView>(R.id.image_view3)
         val imageView4 = findViewById<ImageView>(R.id.image_view4)
-        EasyLoader
+        EasyImage
             .with(this)
             .load("file:///sdcard/test/test.jpeg")
             .placeholder(R.drawable.dark_mode_icon)
@@ -33,7 +32,7 @@ class MainActivity : AppCompatActivity() {
             .rounded(20f)
             .into(imageView)
 
-        EasyLoader
+        EasyImage
             .with(this)
             .load("http://5b0988e595225.cdn.sohucs.com/images/20180723/36df6793a0084d3abc93aa7308bbd31e.gif")
             .placeholder(R.drawable.dark_mode_icon)

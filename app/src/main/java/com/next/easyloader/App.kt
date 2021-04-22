@@ -5,7 +5,7 @@ import android.app.Application
 class App : Application() {
 
     override fun onCreate() {
-        EasyLoader.install(this)
+        EasyImage.install(this)
         super.onCreate()
     }
 }

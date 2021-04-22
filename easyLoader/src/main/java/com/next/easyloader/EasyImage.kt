@@ -30,7 +30,7 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.collections.LinkedHashMap
 
-object EasyLoader : LifecycleEventObserver {
+object EasyImage : LifecycleEventObserver {
     private val io: CoroutineDispatcher = Dispatchers.IO
     private val main: CoroutineDispatcher = Dispatchers.Main
 
@@ -135,7 +135,7 @@ object EasyLoader : LifecycleEventObserver {
 }
 
 class LoaderManager(
-    val easyLoader: EasyLoader,
+    val easyLoader: EasyImage,
     private val io: CoroutineDispatcher,
     private val main: CoroutineDispatcher
 ) {
