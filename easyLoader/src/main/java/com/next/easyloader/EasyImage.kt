@@ -682,6 +682,7 @@ internal class LruMemoryCache(private val context: Context, private val maxSize:
 
     @Synchronized
     override fun put(key: String, drawable: Drawable) {
+        drawable.setVisible(false, true)
         cache.put(key, drawable)
     }
 

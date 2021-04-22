@@ -46,6 +46,9 @@ class GifDrawable(
 
         val bounds = bounds
         canvas.drawBitmap(nextFrame!!, null, bounds, paint)
+
+        if (running)
+            invalidateSelf()
     }
 
     override fun setAlpha(alpha: Int) {
@@ -107,7 +110,7 @@ class GifDrawable(
 //        Log.e("test", "onNextFrame")
         this.nextFrame = nextFrame
         this.nextDelay = nextDelay
-        invalidateSelf()
+//        invalidateSelf()
     }
 
     override fun stop() {
