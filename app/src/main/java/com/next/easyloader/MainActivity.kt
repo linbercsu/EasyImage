@@ -23,7 +23,7 @@ class MyAdapter(private val activity: AppCompatActivity) : RecyclerView.Adapter<
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
         EasyImage
             .with(activity)
-            .load("file:///sdcard/test/test7.gif")
+            .load("http://5b0988e595225.cdn.sohucs.com/images/20180723/36df6793a0084d3abc93aa7308bbd31e.gif")
             .placeholder(R.drawable.dark_mode_icon)
             .error(R.drawable.dailycheck_dialog)
             .fadeIn()
