@@ -60,6 +60,7 @@ object EasyImage : LifecycleEventObserver {
     internal lateinit var memoryCache: MemoryCache
     private lateinit var context: Application
     lateinit var sourceFactory: SourceFactory
+    private val gifDispatcher: CoroutineDispatcher = Executors.newFixedThreadPool(2).asCoroutineDispatcher()
 
     @MainThread
     fun install(builder: EasyImageBuilder) {
@@ -75,7 +76,7 @@ object EasyImage : LifecycleEventObserver {
         val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
         memoryCache = LruMemoryCache(context, memorySizeCalculator.memoryCacheSize)
 
-        decoderFactoryMap["gif"] = GifDecoderFactory(io, main)
+        decoderFactoryMap["gif"] = GifDecoderFactory(gifDispatcher, main)
 
         val okHttp = OkHttpClient.Builder()
             .connectTimeout((15 * 1000).toLong(), TimeUnit.MILLISECONDS)
@@ -589,7 +590,11 @@ internal class DefaultDiskCache(private val context: Context) : DiskCache {
 
 
     override fun put(key: String, data: ByteArray) {
-        File(dir, key).writeBytes(data)
+
+        val file = File(dir, key)
+        val tempFile = File(dir, "${key}.tmp")
+        tempFile.writeBytes(data)
+        tempFile.renameTo(file)
     }
 
     override fun get(key: String): File? {
