@@ -20,6 +20,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.next.easyloader.gif.GifDecoderFactory
+import com.next.easyloader.interfaces.*
 import com.next.easyloader.source.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
@@ -571,32 +572,6 @@ class Request(
     }
 }
 
-interface Transition {
-    @WorkerThread
-    fun transition(previousDrawable: Drawable?, drawable: Drawable): Drawable
-
-    @MainThread
-    fun onAfter(view: ImageView, drawable: Drawable)
-}
-
-interface MemoryCache {
-    fun put(key: String, drawable: Drawable)
-    fun get(key: String): Drawable?
-}
-
-interface DiskCache {
-    fun put(key: String, data: ByteArray)
-    fun get(key: String): File?
-}
-
-interface Decoder {
-    fun decode(bytes: ByteArray, w: Int, h: Int): Drawable?
-}
-
-interface DecoderFactory {
-    fun create(): Decoder
-}
-
 internal object DefaultDecoder : Decoder {
 
     override fun decode(bytes: ByteArray, w: Int, h: Int): Drawable? {
@@ -661,10 +636,6 @@ internal class DefaultDiskCache(private val context: Context) : DiskCache {
         else
             null
     }
-}
-
-interface CacheSizeProvider {
-    fun objectSize(): Int
 }
 
 internal class LruMemoryCache(private val context: Context, private val maxSize: Int) :
