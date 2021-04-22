@@ -21,6 +21,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.next.easyloader.gif.GifDecoderFactory
 import com.next.easyloader.interfaces.*
+import com.next.easyloader.internal.MemorySizeCalculator
 import com.next.easyloader.source.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient

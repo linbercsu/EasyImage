@@ -1,4 +1,4 @@
-package com.next.easyloader;
+package com.next.easyloader.internal;
 
 import android.annotation.TargetApi;
 import android.app.ActivityManager;
