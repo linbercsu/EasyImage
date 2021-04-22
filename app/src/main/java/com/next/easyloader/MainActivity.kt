@@ -5,9 +5,46 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+
+class MyAdapter(private val activity: AppCompatActivity) : RecyclerView.Adapter<MyViewHolder>() {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.list_item, parent, false)
+
+        return MyViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
+        EasyImage
+            .with(activity)
+            .load("file:///sdcard/test/test.gif")
+            .placeholder(R.drawable.dark_mode_icon)
+            .error(R.drawable.dailycheck_dialog)
+            .fadeIn()
+            .rounded(20f)
+            .into(holder.image)
+
+
+    }
+
+    override fun getItemCount(): Int {
+        return 1000
+    }
+
+}
+
+class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    val image: ImageView = itemView.findViewById(R.id.image)
+}
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var recyclerView: RecyclerView
     companion object {
         fun start(activity: Activity) {
             activity.startActivity(Intent(activity, MainActivity::class.java))
@@ -18,11 +55,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         setContentView(R.layout.activity_main)
+        recyclerView = findViewById(R.id.list)
+        val linearLayoutManager = LinearLayoutManager(this)
 
-        val imageView = findViewById<ImageView>(R.id.image_view)
-        val imageView2 = findViewById<ImageView>(R.id.image_view2)
-        val imageView3 = findViewById<ImageView>(R.id.image_view3)
-        val imageView4 = findViewById<ImageView>(R.id.image_view4)
+        recyclerView.layoutManager = linearLayoutManager
+        recyclerView.adapter = MyAdapter(this)
+
+
+//        val imageView = findViewById<ImageView>(R.id.image_view)
+//        val imageView2 = findViewById<ImageView>(R.id.image_view2)
+//        val imageView3 = findViewById<ImageView>(R.id.image_view3)
+//        val imageView4 = findViewById<ImageView>(R.id.image_view4)
+        /*
         EasyImage
             .with(this)
             .load("file:///sdcard/test/test.jpeg")
@@ -40,6 +84,8 @@ class MainActivity : AppCompatActivity() {
             .fadeIn()
             .rounded(20f)
             .into(imageView2)
+
+         */
 //        EasyLoader
 //            .with(this)
 //            .load("file:///sdcard/test/test.gif")

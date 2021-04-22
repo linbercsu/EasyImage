@@ -28,23 +28,51 @@ import java.io.IOException
 import java.lang.Runnable
 import java.lang.ref.WeakReference
 import java.util.*
-import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.*
 import kotlin.collections.LinkedHashMap
 
 class LIFOExecutor(private val executorService: ExecutorService) : Executor {
     private val commandList: LinkedList<Runnable> = LinkedList()
+    private val pausedCommandList: LinkedList<Runnable> = LinkedList()
+    @Volatile
+    private var paused = false
 
     override fun execute(command: Runnable) {
+        synchronized(pausedCommandList) {
+            if (paused) {
+                pausedCommandList.add(command)
+                return
+            }
+        }
+
         synchronized(commandList) {
             commandList.add(command)
         }
         executorService.execute {
+            val last: Runnable
             synchronized(commandList) {
-                executorService.execute(commandList.last)
+                last = commandList.removeLast()
             }
+
+            last.run()
+        }
+    }
+
+    fun pause() {
+        synchronized(pausedCommandList) {
+            paused = true
+        }
+    }
+
+    fun resume() {
+        synchronized(pausedCommandList) {
+            paused = false
+
+            for (run : Runnable in pausedCommandList) {
+                execute(run)
+            }
+
+            pausedCommandList.clear()
         }
     }
 }
@@ -60,16 +88,20 @@ object EasyImage : LifecycleEventObserver {
     internal lateinit var memoryCache: MemoryCache
     private lateinit var context: Application
     lateinit var sourceFactory: SourceFactory
-    private val gifDispatcher: CoroutineDispatcher = Executors.newFixedThreadPool(2).asCoroutineDispatcher()
+    private val gifDispatcher: CoroutineDispatcher =
+        Executors.newFixedThreadPool(2).asCoroutineDispatcher()
+    private lateinit var ioExecutor: LIFOExecutor
 
     @MainThread
     fun install(builder: EasyImageBuilder) {
         this.context = builder.application
         this.main = builder.main ?: Dispatchers.Main
         if (builder.io != null) {
-            this.io = LIFOExecutor(builder.io).asCoroutineDispatcher()
+            ioExecutor = LIFOExecutor(builder.io)
+            this.io = ioExecutor.asCoroutineDispatcher()
         } else {
-            this.io = LIFOExecutor(Executors.newFixedThreadPool(4)).asCoroutineDispatcher()
+            ioExecutor = LIFOExecutor(Executors.newFixedThreadPool(4))
+            this.io = ioExecutor.asCoroutineDispatcher()
         }
 
         diskCache = DefaultDiskCache(context)
@@ -89,6 +121,14 @@ object EasyImage : LifecycleEventObserver {
 
     fun install(context: Application) {
         EasyImageBuilder(context).build()
+    }
+
+    fun pause() {
+        ioExecutor.pause()
+    }
+
+    fun resume() {
+        ioExecutor.resume()
     }
 
     @MainThread
@@ -310,7 +350,7 @@ class Request(
     private val cornerRadius: Float
 ) : ViewTreeObserver.OnPreDrawListener {
 
-    private val ref: WeakReference<ImageView> = WeakReference(target)
+    private var ref: WeakReference<ImageView> = WeakReference(target)
     private val hash = source.hashCode() + target.hashCode()
     var job: Job? = null
     var completed = false
@@ -373,6 +413,8 @@ class Request(
                 viewTreeObserver.removeOnPreDrawListener(this)
             }
         }
+
+        ref = WeakReference<ImageView>(null)
     }
 
     internal fun recycle(memoryCache: MemoryCache) {
@@ -392,7 +434,13 @@ class Request(
         return drawable
     }
 
+    private fun checkCancel(coroutineScope: CoroutineScope) {
+        if (!coroutineScope.isActive)
+            throw kotlinx.coroutines.CancellationException()
+    }
+
     private fun doLoad(coroutineScope: CoroutineScope): Drawable {
+        checkCancel(coroutineScope)
         manager.easyLoader.recycleRequest()
 
         val cacheKey = source.getCacheKey()
@@ -409,6 +457,8 @@ class Request(
 
         Log.e("test", "load2 $memoryCacheKey")
 
+        checkCancel(coroutineScope)
+
         //load from disk cache
         val bytes: ByteArray = if (diskCacheEnabled) {
 
@@ -417,16 +467,18 @@ class Request(
             if (cacheFile != null) {
                 val fileSource = FileSource(cacheFile)
                 val bytes = fileSource.getBytes()
-                diskCache.put(cacheKey, bytes)
                 bytes
             } else {
-                source.getBytes()
+                val bytes = source.getBytes()
+                diskCache.put(cacheKey, bytes)
+                bytes
             }
 
         } else {
             source.getBytes()
         }
 
+        checkCancel(coroutineScope)
         Log.e("test", "load3")
 
         val decoder = manager.easyLoader.getDecoder(source.type)
