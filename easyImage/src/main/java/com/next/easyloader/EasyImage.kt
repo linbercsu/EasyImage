@@ -1,7 +1,9 @@
 package com.next.easyloader
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -33,6 +35,7 @@ import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.concurrent.*
+import kotlin.Comparator
 import kotlin.collections.LinkedHashMap
 
 object EasyImage : LifecycleEventObserver {
@@ -234,7 +237,7 @@ class RequestBuilder(private val manager: RequestManager) {
     private lateinit var url: String
     private var placeholder: Int = 0
     private var errorResId: Int = 0
-    private var diskCacheEnabled = false
+    private var diskCacheEnabled = true
     private var transition: Transition? = null
     private var cornerRadius: Float = 0f
 
@@ -597,33 +600,102 @@ internal object DefaultDecoder : Decoder {
 }
 
 
-internal class DefaultDiskCache(context: Context) : DiskCache {
+internal class DefaultDiskCache(private val context: Context) : DiskCache {
+    companion object {
+        private const val MAX_SIZE = 250 * 1024 * 1024
+    }
 
-    private val dir: File
+    private lateinit var dir: File
+    private var initialized = false
+    private lateinit var preferences: SharedPreferences
+    private val cache: LruCache<String, String> = object : LruCache<String, String>(MAX_SIZE) {
+        override fun sizeOf(key: String, value: String): Int {
+            val file = File(value)
+            if (!file.exists())
+                return 1
 
-    init {
-        var root = context.externalCacheDir
-        if (root == null || !root.exists()) {
-            root = context.cacheDir
+            return file.length().toInt()
         }
 
-        dir = File(root, "easy-l")
-        dir.mkdirs()
+        override fun entryRemoved(
+            evicted: Boolean,
+            key: String,
+            oldValue: String,
+            newValue: String?
+        ) {
+            super.entryRemoved(evicted, key, oldValue, newValue)
+            val file = File(oldValue)
+            if (file.exists() && file.isFile)
+                file.delete()
+        }
+    }
+
+    private fun initialize() {
+        synchronized(this) {
+            if (initialized)
+                return
+
+            initialized = true
+
+            var root = context.externalCacheDir
+            if (root == null || !root.exists()) {
+                root = context.cacheDir
+            }
+
+            dir = File(root, "easy-l")
+            dir.mkdirs()
+
+            preferences = context.getSharedPreferences("__easy__image", Context.MODE_PRIVATE)
+            val all = preferences.all
+            val entries = mutableListOf<MutableMap.MutableEntry<String, *>>()
+            for (entry in all) {
+                entries.add(entry)
+            }
+            entries.sortWith(Comparator { o1, o2 ->
+                if (o1.value !is Long)
+                    return@Comparator -1
+                if (o2.value !is Long)
+                    return@Comparator 1
+                else {
+                    return@Comparator (o1.value as Long).compareTo(o2.value as Long)
+                }
+            })
+
+            for (entry in entries) {
+                cache.put(entry.key, entry.key)
+            }
+        }
     }
 
 
+    @SuppressLint("ApplySharedPref")
     override fun put(key: String, data: ByteArray) {
+        initialize()
 
         val file = File(dir, key)
         val tempFile = File(dir, "${key}.tmp")
         tempFile.writeBytes(data)
-        tempFile.renameTo(file)
+        if (tempFile.renameTo(file)) {
+            synchronized(cache) {
+                cache.put(key, key)
+            }
+
+            preferences.edit().putLong(key, System.currentTimeMillis()).commit()
+        }
     }
 
+    @SuppressLint("ApplySharedPref")
     override fun get(key: String): File? {
+        initialize()
+
+        synchronized(cache) {
+            val get = cache.get(key) ?: return null
+        }
         val file = File(dir, key)
-        return if (file.exists())
+        return if (file.exists() && file.isFile) {
+            preferences.edit().putLong(key, System.currentTimeMillis()).commit()
             file
+        }
         else
             null
     }
@@ -650,12 +722,16 @@ internal class LruMemoryCache(private val maxSize: Int) :
     @Synchronized
     override fun put(key: String, drawable: Drawable) {
         drawable.setVisible(false, true)
-        cache.put(key, drawable)
+        synchronized(cache) {
+            cache.put(key, drawable)
+        }
     }
 
     @Synchronized
     override fun get(key: String): Drawable? {
-        return cache.remove(key)
+        synchronized(cache) {
+            return cache.remove(key)
+        }
     }
 }
 
