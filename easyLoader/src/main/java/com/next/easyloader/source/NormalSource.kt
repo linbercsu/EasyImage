@@ -4,7 +4,7 @@ import okhttp3.OkHttpClient
 import java.io.File
 import java.net.URI
 
-class NormalSource(private val url: String, private val okHttp: OkHttpClient) : Source() {
+class NormalSource(private val url: String, okHttp: OkHttpClient) : Source() {
     private lateinit var source: Source
     override val type: String
         get() {

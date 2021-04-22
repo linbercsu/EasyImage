@@ -25,8 +25,10 @@ import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.IOException
-import java.lang.Runnable
 import java.lang.ref.WeakReference
+import java.math.BigInteger
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.concurrent.*
 import kotlin.collections.LinkedHashMap
@@ -34,6 +36,7 @@ import kotlin.collections.LinkedHashMap
 class LIFOExecutor(private val executorService: ExecutorService) : Executor {
     private val commandList: LinkedList<Runnable> = LinkedList()
     private val pausedCommandList: LinkedList<Runnable> = LinkedList()
+
     @Volatile
     private var paused = false
 
@@ -68,7 +71,7 @@ class LIFOExecutor(private val executorService: ExecutorService) : Executor {
         synchronized(pausedCommandList) {
             paused = false
 
-            for (run : Runnable in pausedCommandList) {
+            for (run: Runnable in pausedCommandList) {
                 execute(run)
             }
 
@@ -419,7 +422,8 @@ class Request(
 
     internal fun recycle(memoryCache: MemoryCache) {
         if (drawable != null) {
-            val cacheKey = source.getCacheKey()
+            var cacheKey = source.getCacheKey()
+            cacheKey = generateName(cacheKey)
             val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
             memoryCache.put(memoryCacheKey, drawable!!)
         }
@@ -443,8 +447,9 @@ class Request(
         checkCancel(coroutineScope)
         manager.easyLoader.recycleRequest()
 
-        val cacheKey = source.getCacheKey()
+        var cacheKey = source.getCacheKey()
         Log.e("test", "load1 $cacheKey $diskCacheEnabled")
+        cacheKey = generateName(cacheKey)
         //load from memory cache
         val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
         val memoryCache = manager.easyLoader.memoryCache
@@ -709,4 +714,23 @@ internal class FadeInTransition : Transition {
     }
 
 }
+
+internal fun generateName(imageUri: String): String {
+    val md5 = getMD5(imageUri.toByteArray())
+    val bi = BigInteger(md5).abs()
+    return bi.toString(10 + 26)
+}
+
+private fun getMD5(data: ByteArray): ByteArray? {
+    var hash: ByteArray? = null
+    try {
+        val digest = MessageDigest.getInstance("MD5")
+        digest.update(data)
+        hash = digest.digest()
+    } catch (e: NoSuchAlgorithmException) {
+        e.printStackTrace()
+    }
+    return hash
+}
+
 
