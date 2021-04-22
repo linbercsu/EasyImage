@@ -25,14 +25,33 @@ import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import java.io.File
 import java.io.IOException
+import java.lang.Runnable
 import java.lang.ref.WeakReference
 import java.util.*
+import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.collections.LinkedHashMap
 
+class LIFOExecutor(private val executorService: ExecutorService) : Executor {
+    private val commandList: LinkedList<Runnable> = LinkedList()
+
+    override fun execute(command: Runnable) {
+        synchronized(commandList) {
+            commandList.add(command)
+        }
+        executorService.execute {
+            synchronized(commandList) {
+                executorService.execute(commandList.last)
+            }
+        }
+    }
+}
+
 object EasyImage : LifecycleEventObserver {
-    private val io: CoroutineDispatcher = Dispatchers.IO
-    private val main: CoroutineDispatcher = Dispatchers.Main
+    private lateinit var io: CoroutineDispatcher
+    private lateinit var main: CoroutineDispatcher
 
     private val map: MutableMap<Any, LoaderManager> = mutableMapOf()
     private val decoderFactoryMap: MutableMap<String, DecoderFactory> = mutableMapOf()
@@ -43,8 +62,15 @@ object EasyImage : LifecycleEventObserver {
     lateinit var sourceFactory: SourceFactory
 
     @MainThread
-    fun install(context: Application) {
-        this.context = context
+    fun install(builder: EasyImageBuilder) {
+        this.context = builder.application
+        this.main = builder.main ?: Dispatchers.Main
+        if (builder.io != null) {
+            this.io = LIFOExecutor(builder.io).asCoroutineDispatcher()
+        } else {
+            this.io = LIFOExecutor(Executors.newFixedThreadPool(4)).asCoroutineDispatcher()
+        }
+
         diskCache = DefaultDiskCache(context)
         val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
         memoryCache = LruMemoryCache(context, memorySizeCalculator.memoryCacheSize)
@@ -58,6 +84,10 @@ object EasyImage : LifecycleEventObserver {
             .build()
 
         sourceFactory = NormalSourceFactory(okHttp)
+    }
+
+    fun install(context: Application) {
+        EasyImageBuilder(context).build()
     }
 
     @MainThread
@@ -133,6 +163,17 @@ object EasyImage : LifecycleEventObserver {
     }
 
 }
+
+class EasyImageBuilder(
+    internal val application: Application,
+    internal val io: ExecutorService? = null,
+    internal val main: CoroutineDispatcher? = null
+) {
+    fun build() {
+        EasyImage.install(this)
+    }
+}
+
 
 class LoaderManager(
     val easyLoader: EasyImage,
@@ -287,7 +328,7 @@ class Request(
 
     @MainThread
     fun start() {
-        Log.e("test", "start")
+        Log.e("test", "start ${source.getCacheKey()}")
         val target: ImageView = ref.get()!!
         val layoutParams = target.layoutParams ?: return
 
@@ -343,6 +384,7 @@ class Request(
 
     @WorkerThread
     fun load(coroutineScope: CoroutineScope): Drawable {
+        Log.e("test", "load ${source.getCacheKey()}")
         var drawable = doLoad(coroutineScope)
 
         drawable = transition?.transition(previousDrawable, drawable) ?: drawable
