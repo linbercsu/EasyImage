@@ -1,4 +1,4 @@
-package com.next.easyloader.interfaces
+package com.next.easyloader.diskcache
 
 import java.io.File
 

@@ -1,9 +1,6 @@
 package com.next.easyloader
 
-import android.annotation.SuppressLint
 import android.app.Application
-import android.content.Context
-import android.content.SharedPreferences
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
@@ -21,13 +18,14 @@ import androidx.core.graphics.drawable.RoundedBitmapDrawable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import com.next.easyloader.diskcache.LruDiskCache
+import com.next.easyloader.diskcache.DiskCache
 import com.next.easyloader.gif.GifDecoderFactory
 import com.next.easyloader.interfaces.*
 import com.next.easyloader.internal.MemorySizeCalculator
 import com.next.easyloader.source.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
-import java.io.File
 import java.io.IOException
 import java.lang.ref.WeakReference
 import java.math.BigInteger
@@ -35,7 +33,6 @@ import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.concurrent.*
-import kotlin.Comparator
 import kotlin.collections.LinkedHashMap
 
 internal const val CONNECT_TIMEOUT = 15_000
@@ -68,7 +65,7 @@ object EasyImage : LifecycleEventObserver {
             this.io = ioExecutor.asCoroutineDispatcher()
         }
 
-        diskCache = DefaultDiskCache(context)
+        diskCache = LruDiskCache(context)
         val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
         memoryCache = LruMemoryCache(memorySizeCalculator.memoryCacheSize)
 
@@ -602,107 +599,6 @@ internal object DefaultDecoder : Decoder {
 
 }
 
-
-internal class DefaultDiskCache(private val context: Context) : DiskCache {
-    companion object {
-        private const val MAX_SIZE = 250 * 1024 * 1024
-    }
-
-    private lateinit var dir: File
-    private var initialized = false
-    private lateinit var preferences: SharedPreferences
-    private val cache: LruCache<String, String> = object : LruCache<String, String>(MAX_SIZE) {
-        override fun sizeOf(key: String, value: String): Int {
-            val file = File(value)
-            if (!file.exists())
-                return 1
-
-            return file.length().toInt()
-        }
-
-        override fun entryRemoved(
-            evicted: Boolean,
-            key: String,
-            oldValue: String,
-            newValue: String?
-        ) {
-            super.entryRemoved(evicted, key, oldValue, newValue)
-            val file = File(oldValue)
-            if (file.exists() && file.isFile)
-                file.delete()
-        }
-    }
-
-    private fun initialize() {
-        synchronized(this) {
-            if (initialized)
-                return
-
-            initialized = true
-
-            var root = context.externalCacheDir
-            if (root == null || !root.exists()) {
-                root = context.cacheDir
-            }
-
-            dir = File(root, "easy-l")
-            dir.mkdirs()
-
-            preferences = context.getSharedPreferences("__easy__image", Context.MODE_PRIVATE)
-            val all = preferences.all
-            val entries = mutableListOf<MutableMap.MutableEntry<String, *>>()
-            for (entry in all) {
-                entries.add(entry)
-            }
-            entries.sortWith(Comparator { o1, o2 ->
-                if (o1.value !is Long)
-                    return@Comparator -1
-                if (o2.value !is Long)
-                    return@Comparator 1
-                else {
-                    return@Comparator (o1.value as Long).compareTo(o2.value as Long)
-                }
-            })
-
-            for (entry in entries) {
-                cache.put(entry.key, entry.key)
-            }
-        }
-    }
-
-
-    @SuppressLint("ApplySharedPref")
-    override fun put(key: String, data: ByteArray) {
-        initialize()
-
-        val file = File(dir, key)
-        val tempFile = File(dir, "${key}.tmp")
-        tempFile.writeBytes(data)
-        if (tempFile.renameTo(file)) {
-            synchronized(cache) {
-                cache.put(key, key)
-            }
-
-            preferences.edit().putLong(key, System.currentTimeMillis()).commit()
-        }
-    }
-
-    @SuppressLint("ApplySharedPref")
-    override fun get(key: String): File? {
-        initialize()
-
-        synchronized(cache) {
-            val get = cache.get(key) ?: return null
-        }
-        val file = File(dir, key)
-        return if (file.exists() && file.isFile) {
-            preferences.edit().putLong(key, System.currentTimeMillis()).commit()
-            file
-        }
-        else
-            null
-    }
-}
 
 internal class LruMemoryCache(private val maxSize: Int) :
     MemoryCache {
