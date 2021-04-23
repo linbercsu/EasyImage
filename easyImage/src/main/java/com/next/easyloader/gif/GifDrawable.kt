@@ -5,7 +5,7 @@ import android.graphics.drawable.Animatable
 import android.graphics.drawable.Drawable
 import android.os.SystemClock
 import android.util.Log
-import com.next.easyloader.interfaces.CacheSizeProvider
+import com.next.easyloader.memorycache.CacheSizeProvider
 import kotlinx.coroutines.*
 
 class GifDrawable(

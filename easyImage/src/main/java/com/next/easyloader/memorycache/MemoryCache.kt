@@ -1,4 +1,4 @@
-package com.next.easyloader.interfaces
+package com.next.easyloader.memorycache
 
 import android.graphics.drawable.Drawable
 

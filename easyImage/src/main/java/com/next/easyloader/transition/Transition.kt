@@ -1,4 +1,4 @@
-package com.next.easyloader.interfaces
+package com.next.easyloader.transition
 
 import android.graphics.drawable.Drawable
 import android.widget.ImageView

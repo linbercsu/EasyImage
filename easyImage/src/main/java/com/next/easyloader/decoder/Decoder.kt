@@ -1,4 +1,4 @@
-package com.next.easyloader.interfaces
+package com.next.easyloader.decoder
 
 import android.graphics.drawable.Drawable
 

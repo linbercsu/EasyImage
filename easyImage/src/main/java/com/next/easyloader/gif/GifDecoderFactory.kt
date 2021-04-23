@@ -1,7 +1,7 @@
 package com.next.easyloader.gif
 
-import com.next.easyloader.interfaces.Decoder
-import com.next.easyloader.interfaces.DecoderFactory
+import com.next.easyloader.decoder.Decoder
+import com.next.easyloader.decoder.DecoderFactory
 import kotlinx.coroutines.CoroutineDispatcher
 
 class GifDecoderFactory(private val io: CoroutineDispatcher, private val main: CoroutineDispatcher) :

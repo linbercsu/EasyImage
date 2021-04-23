@@ -2,9 +2,7 @@ package com.next.easyloader
 
 import android.app.Application
 import android.graphics.*
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.TransitionDrawable
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -13,17 +11,22 @@ import android.view.ViewTreeObserver
 import android.widget.ImageView
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
-import androidx.collection.LruCache
-import androidx.core.graphics.drawable.RoundedBitmapDrawable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import com.next.easyloader.decoder.Decoder
+import com.next.easyloader.decoder.DecoderFactory
+import com.next.easyloader.decoder.DefaultDecoder
 import com.next.easyloader.diskcache.LruDiskCache
 import com.next.easyloader.diskcache.DiskCache
 import com.next.easyloader.gif.GifDecoderFactory
 import com.next.easyloader.interfaces.*
+import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.internal.MemorySizeCalculator
+import com.next.easyloader.memorycache.LruMemoryCache
 import com.next.easyloader.source.*
+import com.next.easyloader.transition.FadeInTransition
+import com.next.easyloader.transition.Transition
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import java.io.IOException
@@ -566,91 +569,6 @@ internal class LIFOExecutor(private val executorService: ExecutorService) : Exec
     }
 }
 
-internal object DefaultDecoder : Decoder {
-
-    override fun decode(bytes: ByteArray, w: Int, h: Int): Drawable? {
-        val options = BitmapFactory.Options()
-        options.inJustDecodeBounds = true
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-
-        options.inJustDecodeBounds = false
-        options.inSampleSize = decideSampleSize(w, h, options.outWidth, options.outHeight)
-        Log.e("test", "decode: ${options.inSampleSize}")
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-        if (bitmap != null)
-            return BitmapDrawable(bitmap)
-
-        return null
-    }
-
-    private fun decideSampleSize(w: Int, h: Int, sourceW: Int, sourceH: Int): Int {
-        var sampleSizeW = 1
-        while (w > 0 && sourceW > w * sampleSizeW) {
-            sampleSizeW *= 2
-        }
-
-        var sampleSizeH = 1
-        while (h > 0 && sourceH > h * sampleSizeH) {
-            sampleSizeH *= 2
-        }
-
-        return sampleSizeH.coerceAtLeast(sampleSizeW)
-    }
-
-}
-
-
-internal class LruMemoryCache(private val maxSize: Int) :
-    MemoryCache {
-    private val cache: LruCache<String, Drawable> = object : LruCache<String, Drawable>(maxSize) {
-        override fun sizeOf(key: String, value: Drawable): Int {
-            return when (value) {
-                is CacheSizeProvider -> {
-                    value.objectSize()
-                }
-                is BitmapDrawable, is RoundedBitmapDrawable -> {
-                    value.intrinsicWidth * value.intrinsicHeight
-                }
-                else -> {
-                    1
-                }
-            }
-        }
-    }
-
-    @Synchronized
-    override fun put(key: String, drawable: Drawable) {
-        drawable.setVisible(false, true)
-        synchronized(cache) {
-            cache.put(key, drawable)
-        }
-    }
-
-    @Synchronized
-    override fun get(key: String): Drawable? {
-        synchronized(cache) {
-            return cache.remove(key)
-        }
-    }
-}
-
-internal class FadeInTransition : Transition {
-    override fun transition(previousDrawable: Drawable?, drawable: Drawable): Drawable {
-        if (previousDrawable == null)
-            return drawable
-
-        val transitionDrawable = TransitionDrawable(arrayOf(previousDrawable, drawable))
-        transitionDrawable.isCrossFadeEnabled = true
-        return transitionDrawable
-    }
-
-    override fun onAfter(view: ImageView, drawable: Drawable) {
-        if (drawable is TransitionDrawable) {
-            drawable.startTransition(400)
-        }
-    }
-
-}
 
 internal fun generateName(imageUri: String): String {
     val md5 = getMD5(imageUri.toByteArray())

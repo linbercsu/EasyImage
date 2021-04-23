@@ -2,7 +2,7 @@ package com.next.easyloader.gif
 
 import android.graphics.drawable.Drawable
 import android.util.Log
-import com.next.easyloader.interfaces.Decoder
+import com.next.easyloader.decoder.Decoder
 import kotlinx.coroutines.CoroutineDispatcher
 
 class DefaultGifDecoder(
