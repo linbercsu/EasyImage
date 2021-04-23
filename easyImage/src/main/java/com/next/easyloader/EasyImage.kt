@@ -20,7 +20,6 @@ import com.next.easyloader.decoder.DefaultDecoder
 import com.next.easyloader.diskcache.LruDiskCache
 import com.next.easyloader.diskcache.DiskCache
 import com.next.easyloader.gif.GifDecoderFactory
-import com.next.easyloader.interfaces.*
 import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.internal.MemorySizeCalculator
 import com.next.easyloader.memorycache.LruMemoryCache
