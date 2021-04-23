@@ -6,12 +6,6 @@ import java.net.URI
 
 class NormalSource(private val url: String, okHttp: OkHttpClient) : Source() {
     private lateinit var source: Source
-    override val type: String
-    init {
-        val uri = URI.create(url)
-        val file = File(uri.path)
-        type = file.extension
-    }
 
     init {
         val uri = URI.create(url)

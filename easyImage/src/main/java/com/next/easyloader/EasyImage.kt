@@ -22,6 +22,7 @@ import com.next.easyloader.diskcache.DiskCache
 import com.next.easyloader.gif.GifDecoderFactory
 import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.internal.MemorySizeCalculator
+import com.next.easyloader.internal.TypeDetector
 import com.next.easyloader.memorycache.LruMemoryCache
 import com.next.easyloader.source.*
 import com.next.easyloader.transition.FadeInTransition
@@ -71,7 +72,7 @@ object EasyImage : LifecycleEventObserver {
         val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
         memoryCache = LruMemoryCache(memorySizeCalculator.memoryCacheSize)
 
-        decoderFactoryMap["gif"] = GifDecoderFactory(gifDispatcher, main)
+        decoderFactoryMap[TypeDetector.TYPE_GIF] = GifDecoderFactory(gifDispatcher, main)
 
         val okHttp = OkHttpClient.Builder()
             .connectTimeout((CONNECT_TIMEOUT).toLong(), TimeUnit.MILLISECONDS)
@@ -436,7 +437,7 @@ class Request(
         checkCancel(coroutineScope)
         Log.e("test", "load3")
 
-        val decoder = manager.easyLoader.getDecoder(source.type)
+        val decoder = manager.easyLoader.getDecoder(TypeDetector.detect(bytes))
         drawable = decoder.decode(bytes, targetW, targetH)
         if (drawable == null) {
             throw IOException()
