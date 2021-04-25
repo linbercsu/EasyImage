@@ -40,6 +40,7 @@ import kotlin.collections.LinkedHashMap
 
 internal const val CONNECT_TIMEOUT = 15_000
 internal const val READ_TIMEOUT = 30_000
+internal const val TAG = "EasyImage"
 
 object EasyImage : LifecycleEventObserver {
     private lateinit var io: CoroutineDispatcher
@@ -323,7 +324,6 @@ class Request(
 
     @MainThread
     fun start() {
-        Log.e("test", "start ${source.getCacheKey()}")
         val target: ImageView = ref.get()!!
         val layoutParams = target.layoutParams ?: return
 
@@ -339,8 +339,6 @@ class Request(
             targetH = ViewGroup.LayoutParams.WRAP_CONTENT
         }
 
-        Log.e("test", "start: $targetW $targetH ${layoutParams.width} ${layoutParams.height}")
-
         val valid: Boolean = targetW != -1 && targetH != -1 && targetW != 0 && targetH != 0
 
         if (!valid) {
@@ -354,7 +352,6 @@ class Request(
 
     @MainThread
     fun cancel() {
-        Log.e("test", "cancel")
         job?.cancel()
         job = null
 
@@ -382,7 +379,6 @@ class Request(
 
     @WorkerThread
     fun load(coroutineScope: CoroutineScope): Drawable {
-        Log.e("test", "load ${source.getCacheKey()}")
         var drawable = doLoad(coroutineScope)
 
         drawable = transition?.transition(previousDrawable, drawable) ?: drawable
@@ -399,19 +395,17 @@ class Request(
         manager.easyLoader.recycleRequest()
 
         var cacheKey = source.getCacheKey()
-        Log.e("test", "load1 $cacheKey $diskCacheEnabled")
         cacheKey = generateName(cacheKey)
         //load from memory cache
         val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
         val memoryCache = manager.easyLoader.memoryCache
         val d = memoryCache.get(memoryCacheKey)
         if (d != null) {
+            Log.i(TAG, "memory cache hit")
             drawable = d
             manager.easyLoader.onRequestSuccessful(this)
             return drawable!!
         }
-
-        Log.e("test", "load2 $memoryCacheKey")
 
         checkCancel(coroutineScope)
 
@@ -421,6 +415,7 @@ class Request(
             val diskCache = manager.easyLoader.diskCache
             val cacheFile = diskCache.get(cacheKey)
             if (cacheFile != null) {
+                Log.i(TAG, "disk cache hit")
                 val fileSource = FileSource(cacheFile)
                 val bytes = fileSource.getBytes()
                 bytes
@@ -435,9 +430,9 @@ class Request(
         }
 
         checkCancel(coroutineScope)
-        Log.e("test", "load3")
-
-        val decoder = manager.easyLoader.getDecoder(TypeDetector.detect(bytes))
+        val type = TypeDetector.detect(bytes)
+        Log.i(TAG, "image type detected $type")
+        val decoder = manager.easyLoader.getDecoder(type)
         drawable = decoder.decode(bytes, targetW, targetH)
         if (drawable == null) {
             throw IOException()
@@ -450,7 +445,6 @@ class Request(
 
     @MainThread
     fun onLoading() {
-        Log.e("test", "onLoading")
         if (placeholder > 0) {
             val get = ref.get()
             get?.setImageResource(placeholder)
@@ -460,7 +454,6 @@ class Request(
 
     @MainThread
     fun onLoaded(drawable: Drawable) {
-        Log.e("test", "callback ${ref.get()}")
         completed = true
         val view = ref.get() ?: return
 
@@ -470,7 +463,6 @@ class Request(
             view.clipToOutline = true
             view.outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) {
-                    Log.e("test", "getOutline: ${view.width} ${view.height} $cornerRadius")
                     outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
                 }
             }
@@ -480,7 +472,6 @@ class Request(
     @MainThread
     fun onError(e: Exception) {
         e.printStackTrace()
-        Log.e("test", "onError")
         if (errorResId > 0) {
             val get = ref.get()
             get?.setImageResource(errorResId)
@@ -509,8 +500,6 @@ class Request(
 
         targetW = target.width
         targetH = target.height
-
-        Log.e("test", "onPreDraw $targetW $targetH")
 
         val viewTreeObserver = target.viewTreeObserver
         if (viewTreeObserver.isAlive) {

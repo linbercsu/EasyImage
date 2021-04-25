@@ -14,7 +14,6 @@ internal object DefaultDecoder : Decoder {
 
         options.inJustDecodeBounds = false
         options.inSampleSize = decideSampleSize(w, h, options.outWidth, options.outHeight)
-        Log.e("test", "decode: ${options.inSampleSize}")
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
         if (bitmap != null)
             return BitmapDrawable(bitmap)

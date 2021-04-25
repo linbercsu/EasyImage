@@ -68,7 +68,6 @@ class GifDrawable(
     }
 
     override fun start() {
-        Log.e("test", "start")
         if (running) {
             stop()
         }
@@ -88,8 +87,6 @@ class GifDrawable(
             val nextDelay = gifDecoder.nextDelay
             val nextFrame = gifDecoder.nextFrame
 
-//            Log.e("test", "next $nextDelay")
-
             launch(main) {
                 val now = SystemClock.elapsedRealtime()
                 val elapsed = now - lastFrameTime
@@ -107,14 +104,12 @@ class GifDrawable(
     }
 
     private fun onNextFrame(nextFrame: Bitmap, nextDelay: Int) {
-//        Log.e("test", "onNextFrame")
         this.nextFrame = nextFrame
         this.nextDelay = nextDelay
 //        invalidateSelf()
     }
 
     override fun stop() {
-        Log.e("test", "stop")
         if (!running)
             return
 
@@ -128,7 +123,6 @@ class GifDrawable(
     }
 
     override fun setVisible(visible: Boolean, restart: Boolean): Boolean {
-        Log.e("test", "setVisible $visible $restart")
         val changed = super.setVisible(visible, restart)
 
         if (visible && !running) {

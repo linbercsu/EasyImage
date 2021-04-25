@@ -23,7 +23,7 @@ class MyAdapter(private val activity: AppCompatActivity) : RecyclerView.Adapter<
     override fun onBindViewHolder(holder: MyViewHolder, position: Int) {
         EasyImage
             .with(activity)
-            .load("http://5b0988e595225.cdn.sohucs.com/images/20180723/36df6793a0084d3abc93aa7308bbd31e.gif")
+            .load("https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fb-ssl.duitang.com%2Fuploads%2Fitem%2F201611%2F04%2F20161104110413_XzVAk.thumb.700_0.gif&refer=http%3A%2F%2Fb-ssl.duitang.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1621752418&t=e2f8cbf44ad8616d6c4bf936b5713400")
             .placeholder(R.drawable.dark_mode_icon)
             .error(R.drawable.dailycheck_dialog)
             .fadeIn()
