@@ -17,19 +17,20 @@ import androidx.lifecycle.LifecycleOwner
 import com.next.easyloader.decoder.Decoder
 import com.next.easyloader.decoder.DecoderFactory
 import com.next.easyloader.decoder.DefaultDecoder
-import com.next.easyloader.diskcache.LruDiskCache
 import com.next.easyloader.diskcache.DiskCache
+import com.next.easyloader.diskcache.LruDiskCache
 import com.next.easyloader.gif.GifDecoderFactory
-import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.internal.MemorySizeCalculator
 import com.next.easyloader.internal.TypeDetector
 import com.next.easyloader.memorycache.LruMemoryCache
+import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.source.*
 import com.next.easyloader.transition.FadeInTransition
 import com.next.easyloader.transition.Transition
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import java.io.IOException
+import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
 import java.math.BigInteger
 import java.security.MessageDigest
@@ -48,7 +49,7 @@ object EasyImage : LifecycleEventObserver {
 
     private val map: MutableMap<LifecycleOwner, RequestManager> = mutableMapOf()
     private val decoderFactoryMap: MutableMap<String, DecoderFactory> = mutableMapOf()
-    private val allCompletedRequests = LinkedHashMap<Request, Request>()
+    internal val requestQueue: ReferenceQueue<Any> = ReferenceQueue()
     internal lateinit var diskCache: DiskCache
     internal lateinit var memoryCache: MemoryCache
     private lateinit var context: Application
@@ -146,29 +147,26 @@ object EasyImage : LifecycleEventObserver {
         map.remove(source)
     }
 
-    @WorkerThread
-    internal fun onRequestSuccessful(request: Request) {
-        synchronized(allCompletedRequests) {
-            allCompletedRequests[request] = request
-        }
+    internal fun recycleRequest(request: Request) {
+        request.recycle(memoryCache)
     }
 
     @WorkerThread
     internal fun recycleRequest() {
-        synchronized(allCompletedRequests) {
-            val iterator = allCompletedRequests.iterator()
-            while (iterator.hasNext()) {
-                val next = iterator.next()
-                if (next.key.recyclable) {
-                    if (next.key.drawable != null) {
-                        next.key.recycle(memoryCache)
+        while (true) {
+            val poll = requestQueue.poll() ?: break
+
+            synchronized(requestQueue) {
+                val request = poll as Request
+                Log.e(TAG, "try to recycle request")
+                if (request.recyclable) {
+                    if (request.drawable != null) {
+                        request.recycle(memoryCache)
                     }
-                    iterator.remove()
                 }
             }
         }
     }
-
 }
 
 
@@ -198,7 +196,7 @@ class RequestManager(
                 val drawable = request.load(this)
 
                 launch(main) {
-                    request.onLoaded(drawable)
+                    request.onLoaded(drawable, true)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -226,6 +224,14 @@ class RequestManager(
         }
 
         requestMap[imageView] = request
+
+        if (start) {
+            val drawable = request.loadFromMemoryCache()
+            if (drawable != null) {
+                request.onLoaded(drawable, false)
+                return
+            }
+        }
 
         request.onLoading()
 
@@ -296,16 +302,17 @@ class RequestBuilder(private val manager: RequestManager) {
 
 class Request(
     private val manager: RequestManager,
-    private val source: Source,
+    internal val source: Source,
     private val placeholder: Int,
     private val errorResId: Int,
     private val transition: Transition?,
     target: ImageView,
     private val diskCacheEnabled: Boolean,
     private val cornerRadius: Float
-) : ViewTreeObserver.OnPreDrawListener {
+) : WeakReference<Any>(target, manager.easyLoader.requestQueue),
+    ViewTreeObserver.OnPreDrawListener {
 
-    private var ref: WeakReference<ImageView> = WeakReference(target)
+    var ref: WeakReference<ImageView> = WeakReference(target)
     private val hash = source.hashCode() + target.hashCode()
     var job: Job? = null
     private var completed = false
@@ -327,6 +334,16 @@ class Request(
         val target: ImageView = ref.get()!!
         val layoutParams = target.layoutParams ?: return
 
+        val view = ref.get()!!
+        if (cornerRadius > 0) {
+            view.clipToOutline = true
+            view.outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
+                }
+            }
+        }
+
         if (target.width > 0) {
             targetW = target.width
         } else if (layoutParams.width == ViewGroup.LayoutParams.WRAP_CONTENT) {
@@ -341,6 +358,7 @@ class Request(
 
         val valid: Boolean = targetW != -1 && targetH != -1 && targetW != 0 && targetH != 0
 
+        Log.i(TAG, "target size $targetW $targetH")
         if (!valid) {
             listening = true
             target.viewTreeObserver.addOnPreDrawListener(this)
@@ -352,6 +370,7 @@ class Request(
 
     @MainThread
     fun cancel() {
+        Log.e(TAG, "cancel")
         job?.cancel()
         job = null
 
@@ -366,16 +385,35 @@ class Request(
         }
 
         ref = WeakReference<ImageView>(null)
+
+        if (drawable != null) {
+            manager.easyLoader.recycleRequest(this)
+        }
     }
 
     internal fun recycle(memoryCache: MemoryCache) {
         if (drawable != null) {
-            var cacheKey = source.getCacheKey()
-            cacheKey = generateName(cacheKey)
+            val cacheKey = source.getCacheKey()
             val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
             memoryCache.put(memoryCacheKey, drawable!!)
         }
     }
+
+    fun loadFromMemoryCache(): Drawable? {
+        manager.easyLoader.recycleRequest()
+        val cacheKey = source.getCacheKey()
+        val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
+        val memoryCache = manager.easyLoader.memoryCache
+        val d = memoryCache.get(memoryCacheKey)
+        if (d != null) {
+            Log.i(TAG, "memory cache hit on main thread")
+            drawable = d
+            return drawable!!
+        }
+
+        return null
+    }
+
 
     @WorkerThread
     fun load(coroutineScope: CoroutineScope): Drawable {
@@ -395,7 +433,6 @@ class Request(
         manager.easyLoader.recycleRequest()
 
         var cacheKey = source.getCacheKey()
-        cacheKey = generateName(cacheKey)
         //load from memory cache
         val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
         val memoryCache = manager.easyLoader.memoryCache
@@ -403,12 +440,12 @@ class Request(
         if (d != null) {
             Log.i(TAG, "memory cache hit")
             drawable = d
-            manager.easyLoader.onRequestSuccessful(this)
             return drawable!!
         }
 
         checkCancel(coroutineScope)
 
+        cacheKey = generateName(cacheKey)
         //load from disk cache
         val bytes: ByteArray = if (diskCacheEnabled) {
 
@@ -438,9 +475,7 @@ class Request(
             throw IOException()
         }
 
-        manager.easyLoader.onRequestSuccessful(this)
         return drawable!!
-//        memoryCache.put(memoryCacheKey, drawable!!)
     }
 
     @MainThread
@@ -453,20 +488,13 @@ class Request(
     }
 
     @MainThread
-    fun onLoaded(drawable: Drawable) {
+    fun onLoaded(drawable: Drawable, transit: Boolean) {
         completed = true
         val view = ref.get() ?: return
 
         view.setImageDrawable(drawable)
-        transition?.onAfter(view, drawable)
-        if (cornerRadius > 0) {
-            view.clipToOutline = true
-            view.outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
-                }
-            }
-        }
+        if (transit)
+            transition?.onAfter(view, drawable)
     }
 
     @MainThread
