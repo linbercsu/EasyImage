@@ -71,8 +71,12 @@ object EasyImage : LifecycleEventObserver {
         }
 
         diskCache = LruDiskCache(context)
-        val memorySizeCalculator = MemorySizeCalculator.Builder(context).build()
-        memoryCache = LruMemoryCache(memorySizeCalculator.memoryCacheSize)
+        val memoryCacheSize: Int
+        if (builder.memoryCacheSize == 0)
+            memoryCacheSize = MemorySizeCalculator.Builder(context).build().memoryCacheSize
+        else
+            memoryCacheSize = builder.memoryCacheSize
+        memoryCache = LruMemoryCache(memoryCacheSize)
 
         decoderFactoryMap[TypeDetector.TYPE_GIF] = GifDecoderFactory(gifDispatcher, main)
 
@@ -393,6 +397,7 @@ class Request(
         val d = memoryCache.get(memoryCacheKey)
         if (d != null) {
             Log.i(TAG, "memory cache hit on main thread")
+            d.setVisible(true, true)
             drawable = d
             return drawable!!
         }
