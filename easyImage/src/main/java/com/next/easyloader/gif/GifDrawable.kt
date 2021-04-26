@@ -41,7 +41,7 @@ class GifDrawable(
     }
 
     override fun draw(canvas: Canvas) {
-        if (nextFrame == null)
+        if (!isVisible || nextFrame == null)
             return
 
         val bounds = bounds
@@ -55,6 +55,7 @@ class GifDrawable(
         if (currentAlpha == alpha)
             return
         paint.alpha = alpha
+        currentAlpha = alpha
 
         invalidateSelf()
     }
