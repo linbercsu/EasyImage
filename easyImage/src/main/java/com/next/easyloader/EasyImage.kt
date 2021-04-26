@@ -384,7 +384,7 @@ class Request(
         if (drawable != null) {
             val cacheKey = source.getCacheKey()
             val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
-            drawable!!.setVisible(false, false)
+//            drawable!!.setVisible(false, false)
             memoryCache.put(memoryCacheKey, drawable!!)
         }
     }
@@ -397,7 +397,7 @@ class Request(
         val d = memoryCache.get(memoryCacheKey)
         if (d != null) {
             Log.i(TAG, "memory cache hit on main thread")
-            d.setVisible(true, true)
+//            d.setVisible(true, true)
             drawable = d
             return drawable!!
         }
@@ -482,6 +482,8 @@ class Request(
     fun onLoaded(drawable: Drawable, transit: Boolean) {
         completed = true
         val view = ref.get() ?: return
+
+        drawable.setVisible(true, true)
 
         view.setImageDrawable(drawable)
         if (transit)

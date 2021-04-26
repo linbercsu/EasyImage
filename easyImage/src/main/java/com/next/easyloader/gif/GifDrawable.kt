@@ -84,9 +84,13 @@ class GifDrawable(
             return
 
         job = GlobalScope.launch(io) {
-            gifDecoder.advance()
-            val nextDelay = gifDecoder.nextDelay
-            val nextFrame = gifDecoder.nextFrame
+            val nextDelay: Int
+            val nextFrame: Bitmap
+            synchronized(gifDecoder) {
+                gifDecoder.advance()
+                nextDelay = gifDecoder.nextDelay
+                nextFrame = gifDecoder.nextFrame
+            }
 
             launch(main) {
                 val now = SystemClock.elapsedRealtime()
