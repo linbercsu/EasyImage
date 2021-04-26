@@ -148,6 +148,7 @@ object EasyImage : LifecycleEventObserver {
     }
 
     internal fun recycleRequest(request: Request) {
+        Log.i(TAG, "try to recycle request 1")
         request.recycle(memoryCache)
     }
 
@@ -158,7 +159,7 @@ object EasyImage : LifecycleEventObserver {
 
             synchronized(requestQueue) {
                 val request = poll as Request
-                Log.e(TAG, "try to recycle request")
+                Log.i(TAG, "try to recycle request 2")
                 if (request.recyclable) {
                     if (request.drawable != null) {
                         request.recycle(memoryCache)
@@ -213,7 +214,7 @@ class RequestManager(
         }
     }
 
-    internal fun onRequest(request: Request, imageView: ImageView, start: Boolean) {
+    internal fun onRequest(request: Request, imageView: ImageView) {
         val previousRequest = requestMap[imageView]
         if (previousRequest != null && previousRequest == request) {
             return
@@ -225,18 +226,13 @@ class RequestManager(
 
         requestMap[imageView] = request
 
-        if (start) {
-            val drawable = request.loadFromMemoryCache()
-            if (drawable != null) {
-                request.onLoaded(drawable, false)
-                return
-            }
+        val drawable = request.loadFromMemoryCache()
+        if (drawable != null) {
+            request.onLoaded(drawable, false)
+            return
         }
 
         request.onLoading()
-
-        if (!start)
-            return
 
         onStartRequestOnly(request, imageView)
     }
@@ -344,33 +340,22 @@ class Request(
             }
         }
 
-        if (target.width > 0) {
-            targetW = target.width
-        } else if (layoutParams.width == ViewGroup.LayoutParams.WRAP_CONTENT) {
-            targetW = ViewGroup.LayoutParams.WRAP_CONTENT
-        }
+        targetW = layoutParams.width
+        targetH = layoutParams.height
 
-        if (target.height > 0) {
-            targetH = target.height
-        } else if (layoutParams.height == ViewGroup.LayoutParams.WRAP_CONTENT) {
-            targetH = ViewGroup.LayoutParams.WRAP_CONTENT
-        }
-
-        val valid: Boolean = targetW != -1 && targetH != -1 && targetW != 0 && targetH != 0
+        val valid: Boolean = targetW != ViewGroup.LayoutParams.MATCH_PARENT && targetH != ViewGroup.LayoutParams.MATCH_PARENT && targetW != 0 && targetH != 0
 
         Log.i(TAG, "target size $targetW $targetH")
         if (!valid) {
             listening = true
             target.viewTreeObserver.addOnPreDrawListener(this)
+        } else {
+            manager.onRequest(this, target)
         }
-
-        manager.onRequest(this, target, valid)
-
     }
 
     @MainThread
     fun cancel() {
-        Log.e(TAG, "cancel")
         job?.cancel()
         job = null
 
@@ -534,7 +519,7 @@ class Request(
             viewTreeObserver.removeOnPreDrawListener(this)
         }
 
-        manager.onStartRequestOnly(this, target)
+        manager.onRequest(this, target)
         return false
     }
 }
