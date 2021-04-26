@@ -380,6 +380,7 @@ class Request(
         if (drawable != null) {
             val cacheKey = source.getCacheKey()
             val memoryCacheKey = "${cacheKey}-${targetW}-${targetH}"
+            drawable!!.setVisible(false, false)
             memoryCache.put(memoryCacheKey, drawable!!)
         }
     }
