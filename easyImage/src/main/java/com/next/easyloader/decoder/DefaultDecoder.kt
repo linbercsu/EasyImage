@@ -1,11 +1,12 @@
 package com.next.easyloader.decoder
 
+import android.content.res.Resources
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Log
 
-internal object DefaultDecoder : Decoder {
+internal class DefaultDecoder(private val res: Resources) : Decoder {
 
     override fun decode(bytes: ByteArray, w: Int, h: Int): Drawable? {
         val options = BitmapFactory.Options()
@@ -16,7 +17,7 @@ internal object DefaultDecoder : Decoder {
         options.inSampleSize = decideSampleSize(w, h, options.outWidth, options.outHeight)
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
         if (bitmap != null)
-            return BitmapDrawable(bitmap)
+            return BitmapDrawable(res, bitmap)
 
         return null
     }

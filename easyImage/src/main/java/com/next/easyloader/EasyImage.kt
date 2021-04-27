@@ -119,7 +119,7 @@ object EasyImage : LifecycleEventObserver {
     }
 
     internal fun getDecoder(type: String): Decoder {
-        val get = decoderFactoryMap[type] ?: return DefaultDecoder
+        val get = decoderFactoryMap[type] ?: return DefaultDecoder(context.resources)
         return get.create()
     }
 
@@ -519,15 +519,20 @@ class Request(
     override fun onPreDraw(): Boolean {
         val target = ref.get()!!
 
-        targetW = target.width
-        targetH = target.height
+        if (target.width > 0)
+            targetW = target.width
+        if (target.height > 0)
+            targetH = target.height
 
         val viewTreeObserver = target.viewTreeObserver
         if (viewTreeObserver.isAlive) {
             viewTreeObserver.removeOnPreDrawListener(this)
         }
 
-        manager.onRequest(this, target)
+        val valid = (targetW > 0 || targetW == ViewGroup.LayoutParams.WRAP_CONTENT) && (targetH > 0 || targetH == ViewGroup.LayoutParams.WRAP_CONTENT)
+        if (valid) {
+            manager.onRequest(this, target)
+        }
         return false
     }
 }
