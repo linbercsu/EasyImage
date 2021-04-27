@@ -9,14 +9,14 @@ internal class FadeInTransition : Transition {
         if (previousDrawable == null)
             return drawable
 
-        val transitionDrawable = TransitionDrawable(arrayOf(previousDrawable, drawable))
-        transitionDrawable.isCrossFadeEnabled = true
+        val transitionDrawable = DefaultTransitionDrawable(drawable)
+//        transitionDrawable.isCrossFadeEnabled = true
         return transitionDrawable
     }
 
     override fun onAfter(view: ImageView, drawable: Drawable) {
-        if (drawable is TransitionDrawable) {
-            drawable.startTransition(400)
+        if (drawable is DefaultTransitionDrawable) {
+            drawable.start()
         }
     }
 
