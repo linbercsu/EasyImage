@@ -39,24 +39,26 @@ internal class LruMemoryCache(private val maxSize: Int) :
     @Synchronized
     override fun get(key: String): Drawable? {
         synchronized(cache) {
-            val remove = cache.remove(key)
-            if (remove != null) {
-                if (remove is BitmapDrawable) {
-                    val bitmap = remove.bitmap
-                    val bitmapKey = BitmapKey(bitmap.width, bitmap.height, bitmap.config)
-                    val mutableList = map[bitmapKey]
-                    if (mutableList != null) {
-                        val iterator = mutableList.iterator()
-                        while (iterator.hasNext()) {
-                            val next = iterator.next()
-                            if (next == key) {
-                                iterator.remove()
-                                break
-                            }
-                        }
-                    }
+            val remove = cache.remove(key) ?: return null
+
+            if (remove !is BitmapDrawable)
+                return remove
+
+            val bitmap = remove.bitmap
+            val bitmapKey = BitmapKey(bitmap.width, bitmap.height, bitmap.config)
+            val mutableList = map[bitmapKey]
+            if (mutableList.isNullOrEmpty())
+                return remove
+
+            val iterator = mutableList.iterator()
+            while (iterator.hasNext()) {
+                val next = iterator.next()
+                if (next == key) {
+                    iterator.remove()
+                    break
                 }
             }
+
             return remove
         }
     }
@@ -85,4 +87,8 @@ internal class LruMemoryCache(private val maxSize: Int) :
 
 }
 
-private data class BitmapKey(private val w: Int, private val h: Int, private val config: Bitmap.Config)
+private data class BitmapKey(
+    private val w: Int,
+    private val h: Int,
+    private val config: Bitmap.Config
+)
