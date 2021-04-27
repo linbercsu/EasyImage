@@ -2,11 +2,9 @@ package com.next.easyloader.transition
 
 import android.graphics.Canvas
 import android.graphics.drawable.Animatable
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
 import android.os.SystemClock
-import android.util.Log
 import com.next.easyloader.internal.DrawableHelper
 import com.next.easyloader.memorycache.CacheSizeProvider
 
@@ -33,7 +31,6 @@ class DefaultTransitionDrawable(private val drawable: Drawable): LayerDrawable(a
             elapsed = 400
 
         val alpha = currentAlpha * elapsed/400
-        Log.e("test", "alpha $alpha")
         drawable.alpha = alpha.toInt()
 
         drawable.draw(canvas)
