@@ -22,6 +22,7 @@ import com.next.easyloader.diskcache.LruDiskCache
 import com.next.easyloader.gif.GifDecoderFactory
 import com.next.easyloader.internal.MemorySizeCalculator
 import com.next.easyloader.internal.TypeDetector
+import com.next.easyloader.memorycache.BitmapPool
 import com.next.easyloader.memorycache.LruMemoryCache
 import com.next.easyloader.memorycache.MemoryCache
 import com.next.easyloader.source.*
@@ -52,6 +53,7 @@ object EasyImage : LifecycleEventObserver {
     internal val requestQueue: ReferenceQueue<Any> = ReferenceQueue()
     internal lateinit var diskCache: DiskCache
     internal lateinit var memoryCache: MemoryCache
+    internal lateinit var bitmapPool: BitmapPool
     private lateinit var context: Application
     lateinit var sourceFactory: SourceFactory
     private val gifDispatcher: CoroutineDispatcher =
@@ -77,6 +79,7 @@ object EasyImage : LifecycleEventObserver {
         else
             memoryCacheSize = builder.memoryCacheSize
         memoryCache = LruMemoryCache(memoryCacheSize)
+        bitmapPool = memoryCache as BitmapPool
 
         decoderFactoryMap[TypeDetector.TYPE_GIF] = GifDecoderFactory(gifDispatcher, main)
 
@@ -119,7 +122,7 @@ object EasyImage : LifecycleEventObserver {
     }
 
     internal fun getDecoder(type: String): Decoder {
-        val get = decoderFactoryMap[type] ?: return DefaultDecoder(context.resources)
+        val get = decoderFactoryMap[type] ?: return DefaultDecoder(context.resources, bitmapPool)
         return get.create()
     }
 
@@ -349,7 +352,6 @@ class Request(
 
         val valid: Boolean = targetW != ViewGroup.LayoutParams.MATCH_PARENT && targetH != ViewGroup.LayoutParams.MATCH_PARENT && targetW != 0 && targetH != 0
 
-        Log.i(TAG, "target size $targetW $targetH")
         if (!valid) {
             listening = true
             target.viewTreeObserver.addOnPreDrawListener(this)

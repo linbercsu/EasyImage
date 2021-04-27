@@ -5,8 +5,9 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Log
+import com.next.easyloader.memorycache.BitmapPool
 
-internal class DefaultDecoder(private val res: Resources) : Decoder {
+internal class DefaultDecoder(private val res: Resources, private val pool: BitmapPool) : Decoder {
 
     override fun decode(bytes: ByteArray, w: Int, h: Int): Drawable? {
         val options = BitmapFactory.Options()
@@ -15,6 +16,10 @@ internal class DefaultDecoder(private val res: Resources) : Decoder {
 
         options.inJustDecodeBounds = false
         options.inSampleSize = decideSampleSize(w, h, options.outWidth, options.outHeight)
+        val inBitmap = pool.getBitmap(options.outWidth/options.inSampleSize, options.outHeight/options.inSampleSize, options.inPreferredConfig)
+        options.inBitmap = inBitmap
+        if (inBitmap != null)
+            Log.i("DefaultDecoder", "bitmap reused")
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
         if (bitmap != null)
             return BitmapDrawable(res, bitmap)
