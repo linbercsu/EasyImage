@@ -14,7 +14,7 @@ internal class LruMemoryCache(private val maxSize: Int) :
         }
     }
 
-    private val bitmapMap: LinkedHashMap<String, Bitmap> = LinkedHashMap()
+    private val map: MutableMap<BitmapKey, MutableList<String>> = mutableMapOf()
 
     @Synchronized
     override fun put(key: String, drawable: Drawable) {
@@ -23,7 +23,15 @@ internal class LruMemoryCache(private val maxSize: Int) :
             cache.put(key, drawable)
 
             if (drawable is BitmapDrawable) {
-                bitmapMap[key] = drawable.bitmap
+                val bitmap = drawable.bitmap
+                val bitmapKey = BitmapKey(bitmap.width, bitmap.height, bitmap.config)
+                var list = map[bitmapKey]
+                if (list == null) {
+                    list = mutableListOf()
+                    map[bitmapKey] = list
+                }
+
+                list.add(key)
             }
         }
     }
@@ -33,7 +41,21 @@ internal class LruMemoryCache(private val maxSize: Int) :
         synchronized(cache) {
             val remove = cache.remove(key)
             if (remove != null) {
-                bitmapMap.remove(key)
+                if (remove is BitmapDrawable) {
+                    val bitmap = remove.bitmap
+                    val bitmapKey = BitmapKey(bitmap.width, bitmap.height, bitmap.config)
+                    val mutableList = map[bitmapKey]
+                    if (mutableList != null) {
+                        val iterator = mutableList.iterator()
+                        while (iterator.hasNext()) {
+                            val next = iterator.next()
+                            if (next == key) {
+                                iterator.remove()
+                                break
+                            }
+                        }
+                    }
+                }
             }
             return remove
         }
@@ -46,22 +68,21 @@ internal class LruMemoryCache(private val maxSize: Int) :
         }
 
         synchronized(cache) {
-            val iterator = bitmapMap.iterator()
-            while (iterator.hasNext()) {
-                val next = iterator.next()
-                val value = next.value
-                val width = value.width
-                val height = value.height
-                val config1 = value.config
+            val bitmapKey = BitmapKey(w, h, config)
+            val mutableList = map[bitmapKey]
+            if (mutableList.isNullOrEmpty())
+                return null
 
-                if (width == w && height == h && config1 == config) {
-                    iterator.remove()
-                    cache.remove(next.key)
-                    return value
-                }
+            val first = mutableList.removeAt(0)
+            val remove = cache.remove(first)
+            if (remove is BitmapDrawable) {
+                return remove.bitmap
             }
         }
 
         return null
     }
+
 }
+
+private data class BitmapKey(private val w: Int, private val h: Int, private val config: Bitmap.Config)
