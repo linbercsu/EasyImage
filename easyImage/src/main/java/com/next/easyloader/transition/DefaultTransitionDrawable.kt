@@ -7,7 +7,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
 import android.os.SystemClock
 import android.util.Log
-import androidx.core.graphics.drawable.RoundedBitmapDrawable
+import com.next.easyloader.internal.DrawableHelper
 import com.next.easyloader.memorycache.CacheSizeProvider
 
 class DefaultTransitionDrawable(private val drawable: Drawable): LayerDrawable(arrayOf(drawable)), Animatable, CacheSizeProvider {
@@ -85,15 +85,7 @@ class DefaultTransitionDrawable(private val drawable: Drawable): LayerDrawable(a
     }
 
     override fun objectSize(): Int {
-        if (drawable is CacheSizeProvider) {
-            return drawable.objectSize()
-        } else {
-            if (drawable is BitmapDrawable || drawable is RoundedBitmapDrawable) {
-                drawable.intrinsicWidth * drawable.intrinsicHeight * 8
-            }
-        }
-
-        return 1
+        return DrawableHelper.calculateDrawableSize(drawable)
     }
 
 }

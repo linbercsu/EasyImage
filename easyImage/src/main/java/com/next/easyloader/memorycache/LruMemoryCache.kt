@@ -1,25 +1,14 @@
 package com.next.easyloader.memorycache
 
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.collection.LruCache
-import androidx.core.graphics.drawable.RoundedBitmapDrawable
+import com.next.easyloader.internal.DrawableHelper
 
 internal class LruMemoryCache(private val maxSize: Int) :
     MemoryCache {
     private val cache: LruCache<String, Drawable> = object : LruCache<String, Drawable>(maxSize) {
         override fun sizeOf(key: String, value: Drawable): Int {
-            return when (value) {
-                is CacheSizeProvider -> {
-                    value.objectSize()
-                }
-                is BitmapDrawable, is RoundedBitmapDrawable -> {
-                    value.intrinsicWidth * value.intrinsicHeight
-                }
-                else -> {
-                    1
-                }
-            }
+            return DrawableHelper.calculateDrawableSize(value)
         }
     }
 
